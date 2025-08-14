@@ -342,6 +342,111 @@ print_status "Installing Arduino development packages..."
 # Note: python3-serial provides the pyserial functionality
 sudo apt install -y python3-serial
 
+# Check and install esptool for ESP32/ESP8266 development
+if ! command -v esptool &> /dev/null && ! command -v esptool.py &> /dev/null; then
+    print_status "Installing esptool for ESP32/ESP8266 development..."
+    sudo apt install -y esptool
+    esptool_was_installed=true
+else
+    if command -v esptool &> /dev/null; then
+        print_status "esptool already installed: $(esptool version 2>/dev/null || echo 'version detection failed')"
+    elif command -v esptool.py &> /dev/null; then
+        print_status "esptool.py already installed: $(esptool.py version 2>/dev/null || echo 'version detection failed')"
+    fi
+    esptool_was_installed=false
+fi
+
+# Check for ESP32-S3 stub flasher file and download if missing
+if command -v esptool &> /dev/null || command -v esptool.py &> /dev/null; then
+    esp32s3_stub_path="/usr/lib/python3/dist-packages/esptool/targets/stub_flasher/stub_flasher_32s3.json"
+    
+    if [ ! -f "$esp32s3_stub_path" ]; then
+        print_status "Checking ESP32-S3 support in esptool..."
+        echo ""
+        echo "ℹ️  About ESP32-S3 Support:"
+        echo "   The ESP32-S3 is a newer chip that requires specific flasher stub files"
+        echo "   to upload code properly. System packages of esptool are often outdated"
+        echo "   and missing the ESP32-S3 stub file, causing upload failures."
+        echo ""
+        echo "🔧 What this fix does:"
+        echo "   • Downloads the latest ESP32-S3 stub file from Espressif's GitHub"
+        echo "   • Installs it in the correct location for your system's esptool"
+        echo "   • Enables ESP32-S3 development without replacing entire esptool package"
+        echo ""
+        print_status "ESP32-S3 stub flasher file missing, checking GitHub availability..."
+        
+        # First check if the file is available on GitHub
+        github_stub_url="https://raw.githubusercontent.com/espressif/esptool/master/esptool/targets/stub_flasher/1/esp32s3.json"
+        if curl -sSL --connect-timeout 10 --max-time 15 --fail --head "$github_stub_url" > /dev/null 2>&1; then
+            print_status "ESP32-S3 stub file found on GitHub, downloading..."
+            
+            # Create directory if it doesn't exist
+            stub_dir="/usr/lib/python3/dist-packages/esptool/targets/stub_flasher"
+            if [ ! -d "$stub_dir" ]; then
+                print_status "Creating esptool stub_flasher directory..."
+                sudo mkdir -p "$stub_dir"
+            fi
+            
+            # Download ESP32-S3 stub file from GitHub
+            temp_stub="/tmp/esp32s3_stub.json"
+            if safe_curl "$github_stub_url" "$temp_stub"; then
+                # Verify downloaded file is a valid JSON file and not empty
+                if [ -s "$temp_stub" ] && python3 -c "import json; json.load(open('$temp_stub'))" 2>/dev/null; then
+                    # Move to correct location with correct name
+                    sudo mv "$temp_stub" "$esp32s3_stub_path"
+                    sudo chmod 644 "$esp32s3_stub_path"
+                    print_status "✅ ESP32-S3 stub flasher file installed successfully"
+                else
+                    print_error "Downloaded ESP32-S3 stub file appears invalid (not valid JSON or empty)"
+                    print_status "File contents preview:"
+                    head -n 5 "$temp_stub" 2>/dev/null || echo "Could not read file"
+                    rm -f "$temp_stub"
+                fi
+            else
+                print_error "Failed to download ESP32-S3 stub flasher file"
+                print_warning "ESP32-S3 development may not work properly"
+            fi
+        else
+            print_warning "⚠️  ESP32-S3 stub file not available on GitHub"
+            echo ""
+            echo "ℹ️  This may indicate:"
+            echo "   • GitHub repository structure has changed"
+            echo "   • File has been moved to a different location"
+            echo "   • Temporary GitHub connectivity issues"
+            echo ""
+            echo "💡 Impact:"
+            echo "   • ESP32/ESP8266 development will work normally"
+            echo "   • ESP32-S3 specific development may have issues"
+            echo "   • You can manually fix this later if needed"
+            echo ""
+            echo "🔗 Manual download URL: $github_stub_url"
+            echo ""
+            
+            while true; do
+                echo -n "❓ Continue with script setup without ESP32-S3 stub fix? (y/n): "
+                read -r continue_choice
+                
+                case $continue_choice in
+                    [Yy]* ) 
+                        print_status "Continuing setup without ESP32-S3 stub fix..."
+                        break
+                        ;;
+                    [Nn]* ) 
+                        print_error "Setup cancelled by user due to ESP32-S3 stub issue"
+                        print_status "You can retry the script later or manually install the stub file"
+                        exit 1
+                        ;;
+                    * ) 
+                        echo "Please answer y (yes to continue) or n (no, exit script)."
+                        ;;
+                esac
+            done
+        fi
+    else
+        print_status "✅ ESP32-S3 stub flasher file already available"
+    fi
+fi
+
 # Install additional useful packages for embedded development
 print_status "Installing additional development tools..."
 sudo apt install -y build-essential cmake ninja-build
