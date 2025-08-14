@@ -1,6 +1,6 @@
 # Linux Mint Arduino/Embedded Development Setup
 
-**One-click script to install useful VSCode/Platformio IDE for Arduino and ESP32 embedded development.**
+**One-click script to install VSCode/Platformio IDE and other tools for Arduino and ESP32 embedded development.**
 
 ## 🚀 What This Script Does
 
