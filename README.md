@@ -10,7 +10,7 @@ Automatically sets up a professional embedded development environment with:
 - **PlatformIO Core** for Arduino and embedded development  
 - **Arduino development tools** (esptool, serial libraries, build tools)
 - **Serial port access** configuration (dialout group, permissions)
-- **ESP32-S3 support** (downloads missing stub files for newer chips)
+- **ESP32-S3 support** (downloads missing stub file for ESP32-S3)
 - **Linux-specific fixes** (BRLTTY removal, firewall awareness)
 
 ## 🎯 Key Features
